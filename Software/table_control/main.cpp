@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include <iostream>
+#include <thread>
 
 #include <boost/program_options.hpp>
 
@@ -27,9 +28,54 @@ PlaneListener::PlaneListener()
 using namespace std;
 namespace po = boost::program_options;
 
+class ControlSystem
+{
+public:
+    ControlSystem();
+    ~ControlSystem();
+
+private:
+    void threadRoutine();
+    bool isActive;
+
+    thread _thread;
+};
+
+ControlSystem::ControlSystem() : isActive(true)
+{
+    _thread = thread(&ControlSystem::threadRoutine, this);
+
+    cout << "Thread created" << endl;
+}
+
+ControlSystem::~ControlSystem()
+{
+    isActive = false;
+}
+
+void ControlSystem::threadRoutine()
+{
+    const chrono::milliseconds intervalMillis(1000);
+
+    chrono::system_clock::time_point currentTime;
+    chrono::system_clock::time_point nextPeriodTime;
+
+    while (isActive)
+    {
+        currentTime = chrono::system_clock::now();
+        nextPeriodTime = currentTime + intervalMillis;
+
+        cout << "Hello!" << endl;
+
+        this_thread::sleep_until(nextPeriodTime);
+    }
+}
+
 int main(int argc, char *argv[])
 {
     string dev;
+
+    ControlSystem system;
 
     po::options_description desc{"Options"};
     auto opts_init = desc.add_options();

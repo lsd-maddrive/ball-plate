@@ -9,6 +9,4 @@ find_package(Boost REQUIRED COMPONENTS
                 )
 
 add_executable(${PROJECT_NAME} main.cpp)
-target_link_libraries(${PROJECT_NAME} 
-                        Boost::program_options 
-                        )
+target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES} pthread)
