@@ -130,25 +130,30 @@ void initADC(void)
     gptStartContinuous(&GPTD6, gpt4cfg3.frequency/1000);         // how often we need ADC value
     /* Just set the limit (interval) of timer counter, you can use this function
        not only for ADC triggering, but start infinite counting of timer for callback processing */
+
+
+
+    float coefficient_b_for_line = (((-1)*ADC_LOWER_LIMIT*(MAX_VALUE_PERCENT_ADC - MIN_VALUE_PERCENT_ADC))/(ADC_UPPER_LIMIT - ADC_LOWER_LIMIT)) + MIN_VALUE_PERCENT_ADC;
+    float coefficient_k_for_line = (MAX_VALUE_PERCENT_ADC - MIN_VALUE_PERCENT_ADC) / (ADC_UPPER_LIMIT - ADC_LOWER_LIMIT);
 }
 
 
-int32_t getPositionFirstServo(void)
+float getPositionFirstServo(void)
 {
     
     average_value_of_the_first_ADC = CLIP_VALUE(average_value_of_the_first_ADC, ADC_LOWER_LIMIT, ADC_UPPER_LIMIT);
 
-    float percent_value_first_ADC = (((average_value_of_the_first_ADC - ADC_LOWER_LIMIT)*(MIN_VALUE_PERCENT_ADC + MAX_VALUE_PERCENT_ADC)) / (ADC_UPPER_LIMIT - ADC_LOWER_LIMIT)) + MIN_VALUE_PERCENT_ADC;
-    return average_value_of_the_first_ADC;
+    float percent_value_first_ADC = average_value_of_the_first_ADC * coefficient_k_for_line + coefficient_b_for_line;
+    return percent_value_first_ADC;
 }
 
 
-int32_t getPositionSecondServo(void)
+float getPositionSecondServo(void)
 {
 
     average_value_of_the_second_ADC = CLIP_VALUE(average_value_of_the_second_ADC, ADC_LOWER_LIMIT, ADC_UPPER_LIMIT);
-    float percent_value_second_ADC = (((average_value_of_the_second_ADC - ADC_LOWER_LIMIT)*(MIN_VALUE_PERCENT_ADC + MAX_VALUE_PERCENT_ADC)) / (ADC_UPPER_LIMIT - ADC_LOWER_LIMIT)) + MIN_VALUE_PERCENT_ADC;
-    return average_value_of_the_second_ADC;
+    float percent_value_second_ADC = average_value_of_the_second_ADC * coefficient_k_for_line + coefficient_b_for_line;
+    return percent_value_second_ADC;
 }
 
 

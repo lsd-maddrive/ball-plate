@@ -10,8 +10,8 @@
 void initADC(void);
 
 
-int32_t getPositionSecondServo(void);
-int32_t getPositionFirstServo(void);
+float getPositionSecondServo(void);
+float getPositionFirstServo(void);
 
 
 

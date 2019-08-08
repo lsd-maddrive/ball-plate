@@ -54,7 +54,7 @@ void initMotorPWM( void )
 
 }
 
-void turnFirstMotor(int32_t value_first_motor){
+void turnFirstMotor(float value_first_motor){
 
     value_first_motor = CLIP_VALUE(value_first_motor, MIN_VALUE_MOTOR, MAX_VALUE_MOTOR);
     value_first_motor = value_first_motor * COEF_PERIOD;
@@ -83,7 +83,7 @@ void turnFirstMotor(int32_t value_first_motor){
 }
 
 
-void turnSecondMotor(int32_t value_second_motor){
+void turnSecondMotor(float value_second_motor){
     value_second_motor = CLIP_VALUE(value_second_motor, MIN_VALUE_MOTOR, MAX_VALUE_MOTOR);
 
     value_second_motor = value_second_motor * COEF_PERIOD;

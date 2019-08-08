@@ -11,8 +11,8 @@
 
 void initMotorPWM( void );
 
-void turnFirstMotor(int32_t value_first_motor);
-void turnSecondMotor(int32_t value_second_motor);
+void turnFirstMotor(float value_first_motor);
+void turnSecondMotor(float value_second_motor);
 
 
 
