@@ -3,72 +3,73 @@
 #include <communication.h>
 #include <positionFB.h>
 #include <chprintf.h>
+
+#include <motorControl.h>
 /* For module test.
 Obtaining speed and angle values and sending them is processed.
 */
 
-typedef struct {
-    void (*on_set)(uint8_t speed, uint8_t angle);
-    void (*on_start)(void);
-    void (*on_stop)(void);
-} structEventFun_t;
 
-void funct_on_stop(void){
-    palToggleLine(LINE_LED1);
-    chThdSleepMilliseconds(200);
-}
-
-void funct_on_start(void){
-    palToggleLine(LINE_LED2);
-    chThdSleepMilliseconds(200);
-}
-
-void fucnt_on_set(uint8_t speed, uint8_t street)
-{
-    palToggleLine(LINE_LED3);
-    chThdSleepMilliseconds(200);
-}
 
 int main(void)
 {
     chSysInit();
     halInit();
 
-    initADC();
+    static const SerialConfig sd_st_cfg = {
+        .speed = 115200,
+        .cr1 = 0,
+        .cr2 = 0,
+        .cr3 = 0};
 
-    communicationEventFun_t structForFunc = {NULL, NULL, NULL};
+    sdStart(&SD3, &sd_st_cfg);
+    palSetPadMode(GPIOD, 8, PAL_MODE_ALTERNATE(7));
+    palSetPadMode(GPIOD, 9, PAL_MODE_ALTERNATE(7));
+
+    // debug_stream = (BaseSequentialStream *)&SD3;
+    // comm_chn = (BaseChannel *)&SD3;
+
+
  
-    structForFunc.on_set = &fucnt_on_set;
-    structForFunc.on_start =&funct_on_start;
-    structForFunc.on_stop =&funct_on_stop;
-    
-    comm_init(structForFunc);
-    
+    int32_t value_motor_first = 0;
+
+    initMotorPWM();
+    initADC();
 
     while ( true )
     {   
-        comm_dbgprintf_info("First Serv %d \n",getPositionFirstServo());
-        if (getPositionFirstServo() > 2000)
+        palToggleLine(LINE_LED1);
+        chprintf(&SD3, "W: %d\n", getPositionFirstServo());
+        msg_t msg  = sdGetTimeout(&SD3,MS2ST(100));
+        if(msg == MSG_TIMEOUT)
         {
-            palSetLine(LINE_LED1);
-        }
-        else
-        {
-            palClearLine(LINE_LED1);
-            
-        }
-       comm_dbgprintf_info("Second Serv %d \n",getPositionSecondServo());
-        if (getPositionSecondServo() > 2000)
-        {
-            palSetLine(LINE_LED2);
-        }
-        else
-        {
-            palClearLine(LINE_LED2);
-        
+            continue;
         }
         
-        // getPositionSecondServo();
-        chThdSleepMilliseconds(200);
+        char val = msg;
+
+        switch (val)
+        {
+            case 'q':
+                value_motor_first += 5;
+                break;
+                // palToggleLine(LINE_LED1);
+
+            case 'w':
+                value_motor_first -= 5;
+                
+                break;
+
+            case 'e':
+                value_motor_first = 0;
+                break;
+
+        }
+
+        
+        
+        turnFirstMotor(value_motor_first);
+
+        
     }
 }

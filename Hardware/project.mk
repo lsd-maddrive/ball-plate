@@ -3,6 +3,7 @@ PROJECT_CSRC 	= main.c \
 					communication.c \
 					usbcfg.c \
 					positionFB.c \
+					motorControl.c \
 					
 PROJECT_CPPSRC 	= 
 

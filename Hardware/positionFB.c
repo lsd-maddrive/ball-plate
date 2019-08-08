@@ -6,10 +6,16 @@
 
 
 #define ADC1_NUM_CHANNELS   1
-#define ADC1_BUF_DEPTH      8
+#define ADC1_BUF_DEPTH      40
 
 #define ADC3_NUM_CHANNELS   1
-#define ADC3_BUF_DEPTH      8
+#define ADC3_BUF_DEPTH      40
+
+#define ADC_LOWER_LIMIT     100
+#define ADC_UPPER_LIMIT     4000
+
+#define MIN_VALUE_PERCENT_ADC   -100
+#define MAX_VALUE_PERCENT_ADC   100
 
 static adcsample_t samples1[ADC1_NUM_CHANNELS * ADC1_BUF_DEPTH];
 static adcsample_t samples3[ADC3_NUM_CHANNELS * ADC3_BUF_DEPTH];
@@ -129,12 +135,19 @@ void initADC(void)
 
 int32_t getPositionFirstServo(void)
 {
+    
+    average_value_of_the_first_ADC = CLIP_VALUE(average_value_of_the_first_ADC, ADC_LOWER_LIMIT, ADC_UPPER_LIMIT);
+
+    float percent_value_first_ADC = (((average_value_of_the_first_ADC - ADC_LOWER_LIMIT)*(MIN_VALUE_PERCENT_ADC + MAX_VALUE_PERCENT_ADC)) / (ADC_UPPER_LIMIT - ADC_LOWER_LIMIT)) + MIN_VALUE_PERCENT_ADC;
     return average_value_of_the_first_ADC;
 }
 
 
 int32_t getPositionSecondServo(void)
 {
+
+    average_value_of_the_second_ADC = CLIP_VALUE(average_value_of_the_second_ADC, ADC_LOWER_LIMIT, ADC_UPPER_LIMIT);
+    float percent_value_second_ADC = (((average_value_of_the_second_ADC - ADC_LOWER_LIMIT)*(MIN_VALUE_PERCENT_ADC + MAX_VALUE_PERCENT_ADC)) / (ADC_UPPER_LIMIT - ADC_LOWER_LIMIT)) + MIN_VALUE_PERCENT_ADC;
     return average_value_of_the_second_ADC;
 }
 
