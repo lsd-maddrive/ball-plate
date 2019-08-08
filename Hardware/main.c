@@ -3,7 +3,7 @@
 #include <communication.h>
 #include <positionFB.h>
 #include <chprintf.h>
-
+#include <systemControl.h>
 #include <motorControl.h>
 /* For module test.
 Obtaining speed and angle values and sending them is processed.
@@ -30,16 +30,20 @@ int main(void)
     // comm_chn = (BaseChannel *)&SD3;
 
 
- 
+    float task = 0;
     int32_t value_motor_first = 0;
-
-    initMotorPWM();
     initADC();
 
+    
+    // initControlPID();
+    initMotorPWM();
     while ( true )
     {   
         palToggleLine(LINE_LED1);
-        chprintf(&SD3, "W: %d\n", getPositionFirstServo());
+        int32_t tasks = task;
+        int32_t value = getPositionFirstServo() * 10;
+        chprintf(&SD3, "W: %d, %d, %d\n", value, getRawPositionFirstServo(), tasks);
+        
         msg_t msg  = sdGetTimeout(&SD3,MS2ST(100));
         if(msg == MSG_TIMEOUT)
         {
@@ -50,26 +54,60 @@ int main(void)
 
         switch (val)
         {
-            case 'q':
-                value_motor_first += 5;
-                break;
-                // palToggleLine(LINE_LED1);
-
-            case 'w':
-                value_motor_first -= 5;
+            
+            // case 'a':
+            //     enableThreadControl();
+            //     // palToggleLine(LINE_LED1);
+            //     break;
                 
+
+            // case 'd':
+            //     disableThreadControl();
+                
+            //     break;
+
+            // case 'q':
+            //     task += 5;
+            //     setTaskFirstServo(task);
+            //     break;
+
+            // case 'e':
+            //     task -= 5;
+            //     setTaskFirstServo(task);
+            //     break;
+
+            // case 'w':
+            //     task = 0;
+            //     setTaskFirstServo(task);
+            //     break;
+
+
+            case 's':
+                task += 5;
+                turnFirstMotor( task);
+                turnSecondMotor(task);
                 break;
 
-            case 'e':
-                value_motor_first = 0;
+            case 'x':
+                task -= 5;
+                turnFirstMotor( task);
+                turnSecondMotor(task);
+                break;
+
+            
+            case 'z':
+                task = 0;
+                turnFirstMotor( task);
+                turnSecondMotor(task);
                 break;
 
         }
 
         
-        
-        turnFirstMotor(value_motor_first);
 
+        
+
+        chThdSleepMilliseconds(200);
         
     }
 }

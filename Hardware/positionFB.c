@@ -11,11 +11,11 @@
 #define ADC3_NUM_CHANNELS   1
 #define ADC3_BUF_DEPTH      40
 
-#define ADC_LOWER_LIMIT     100
-#define ADC_UPPER_LIMIT     4000
+#define ADC_LOWER_LIMIT     100.
+#define ADC_UPPER_LIMIT     4000.
 
-#define MIN_VALUE_PERCENT_ADC   -100
-#define MAX_VALUE_PERCENT_ADC   100
+#define MIN_VALUE_PERCENT_ADC   -100.
+#define MAX_VALUE_PERCENT_ADC   100.
 
 static adcsample_t samples1[ADC1_NUM_CHANNELS * ADC1_BUF_DEPTH];
 static adcsample_t samples3[ADC3_NUM_CHANNELS * ADC3_BUF_DEPTH];
@@ -23,7 +23,8 @@ static adcsample_t samples3[ADC3_NUM_CHANNELS * ADC3_BUF_DEPTH];
 int32_t average_value_of_the_first_ADC;
 int32_t average_value_of_the_second_ADC;
 
-
+float coefficient_b_for_line = 0;
+float coefficient_k_for_line = 0;
 // Cons for GPT PA4
 static const GPTConfig gpt4cfg1 = {
     .frequency =  100000,
@@ -112,8 +113,8 @@ static const ADCConversionGroup adcgrpcfg3 = {
 
 void initADC(void)
 {
-    gptStart(&GPTD4, &gpt4cfg1);
-    gptStart(&GPTD6, &gpt4cfg3);
+    gptStart(&GPTD9, &gpt4cfg1);
+    gptStart(&GPTD1, &gpt4cfg3);
 
     // ADC driver
     adcStart(&ADCD1, NULL);
@@ -126,15 +127,17 @@ void initADC(void)
     adcStartConversion(&ADCD1, &adcgrpcfg1, samples1, ADC1_BUF_DEPTH);
     adcStartConversion(&ADCD3, &adcgrpcfg3, samples3, ADC3_BUF_DEPTH);
 
-    gptStartContinuous(&GPTD4, gpt4cfg1.frequency/1000);   
-    gptStartContinuous(&GPTD6, gpt4cfg3.frequency/1000);         // how often we need ADC value
+    gptStartContinuous(&GPTD9, gpt4cfg1.frequency/1000);   //4
+    gptStartContinuous(&GPTD1, gpt4cfg3.frequency/1000);         // how often we need ADC value  6
     /* Just set the limit (interval) of timer counter, you can use this function
        not only for ADC triggering, but start infinite counting of timer for callback processing */
 
 
 
-    float coefficient_b_for_line = (((-1)*ADC_LOWER_LIMIT*(MAX_VALUE_PERCENT_ADC - MIN_VALUE_PERCENT_ADC))/(ADC_UPPER_LIMIT - ADC_LOWER_LIMIT)) + MIN_VALUE_PERCENT_ADC;
-    float coefficient_k_for_line = (MAX_VALUE_PERCENT_ADC - MIN_VALUE_PERCENT_ADC) / (ADC_UPPER_LIMIT - ADC_LOWER_LIMIT);
+     coefficient_b_for_line = (((-1)*ADC_LOWER_LIMIT*(MAX_VALUE_PERCENT_ADC - MIN_VALUE_PERCENT_ADC))/
+                                (ADC_UPPER_LIMIT - ADC_LOWER_LIMIT)) + MIN_VALUE_PERCENT_ADC;
+
+     coefficient_k_for_line = (MAX_VALUE_PERCENT_ADC - MIN_VALUE_PERCENT_ADC) / (ADC_UPPER_LIMIT - ADC_LOWER_LIMIT);
 }
 
 
@@ -145,6 +148,16 @@ float getPositionFirstServo(void)
 
     float percent_value_first_ADC = average_value_of_the_first_ADC * coefficient_k_for_line + coefficient_b_for_line;
     return percent_value_first_ADC;
+}
+
+int32_t getRawPositionFirstServo(void)
+{
+    return average_value_of_the_first_ADC;
+}
+
+int32_t getRawPositionSecondServo(void)
+{
+    return average_value_of_the_second_ADC;
 }
 
 

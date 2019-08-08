@@ -13,8 +13,10 @@ void initADC(void);
 float getPositionSecondServo(void);
 float getPositionFirstServo(void);
 
+int32_t getRawPositionSecondServo(void);
+int32_t getRawPositionFirstServo(void);
 
 
 
 
-#endif //_COMMUNICATION_
+#endif //_POSITIONFB_

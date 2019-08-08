@@ -2,8 +2,7 @@
 #include <hal.h>
 
 
-static void tilt_unit_set_horizontal_pos( int16_t pos_val );
-static void tilt_unit_set_vertical_pos( int16_t pos_val );
+
 
 
 #define MIN_VALUE_MOTOR     -100
@@ -30,7 +29,7 @@ PWMConfig pwmConf = {
     .dier           = 0
 };
 
-PWMDriver *motor_driver_control = &PWMD1; 
+PWMDriver *motor_driver_control = &PWMD4; 
 
 
 // PWMDriver *pwm_hrz_dr = &PWMD2;
@@ -39,8 +38,14 @@ PWMDriver *motor_driver_control = &PWMD1;
 void initMotorPWM( void )
 {
 
-    palSetPadMode( GPIOE, 9,  PAL_MODE_ALTERNATE(1));
-    palSetPadMode( GPIOE, 11, PAL_MODE_ALTERNATE(1));
+    palSetPadMode( GPIOB, 6,  PAL_MODE_ALTERNATE(2));
+    palSetPadMode( GPIOD, 13, PAL_MODE_ALTERNATE(3));
+
+    // palSetPadMode( GPIOE, 5,  PAL_MODE_ALTERNATE(3));
+    // palSetPadMode( GPIOE, 6, PAL_MODE_ALTERNATE(3));
+
+    // palSetPadMode( GPIOE,  9, PAL_MODE_ALTERNATE(1));
+    // palSetPadMode( GPIOE, 11, PAL_MODE_ALTERNATE(1));
     palSetPadMode( GPIOE, 13, PAL_MODE_ALTERNATE(1));
     palSetPadMode( GPIOE, 14, PAL_MODE_ALTERNATE(1));
 
