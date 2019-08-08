@@ -12,6 +12,8 @@
 
 #include <iostream>
 
+#include <boost/program_options.hpp>
+
 class PlaneListener
 {
 public:
@@ -23,21 +25,32 @@ PlaneListener::PlaneListener()
 }
 
 using namespace std;
+namespace po = boost::program_options;
 
 int main(int argc, char *argv[])
 {
+    string dev;
+
+    po::options_description desc{"Options"};
+    auto opts_init = desc.add_options();
+    opts_init("help,h", "Help screen");
+    opts_init("device,d", po::value<string>(), "Device to read");
+
+    po::variables_map vm;
+    po::store(parse_command_line(argc, argv, desc), vm);
+    po::notify(vm);
+
+    if (vm.count("help"))
+        cout << desc << endl;
+    else if (vm.count("device"))
+        dev = vm["device"].as<string>();
+
     int fd;
-    const char *dev;
     struct input_event ie;
 
-    if (argc != 2)
-    {
-        cerr << "Invalid arguments" << endl;
-    }
+    cout << "Reading device: " << dev << endl;
 
-    dev = argv[1];
-
-    if ((fd = open(dev, O_RDONLY)) == -1)
+    if ((fd = open(dev.c_str(), O_RDONLY)) == -1)
     {
         cerr << "Failed to open device" << endl;
         exit(EXIT_FAILURE);
@@ -52,6 +65,7 @@ int main(int argc, char *argv[])
         {
         case EV_KEY:
             cout << "Key pressed: " << ie.value << endl;
+            break;
 
         case EV_ABS:
             if (ie.code == ABS_X)
@@ -66,6 +80,7 @@ int main(int argc, char *argv[])
             cout << "New ABS position: ("
                  << last_pos_x << ", "
                  << last_pos_y << ")" << endl;
+            break;
         }
     }
 
