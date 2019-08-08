@@ -3,123 +3,100 @@
 #include <motorControl.h>
 #include <hal.h>
 
+#include <string.h>
+
 float previous_value_error = 0;
 
 float the_task_PID_first_serv = 0;
 float the_task_PID_second_serv = 0;
 
 float P_coefficient_first_serv = 0.3;
-float I_coefficient_first_serv = 0;
+float I_coefficient_first_serv = 0.01;
 float D_coefficient_first_serv = 0;
 
 float P_coefficient_second_serv = 0.3;
-float I_coefficient_second_serv = 0;
+float I_coefficient_second_serv = 0.01;
 float D_coefficient_second_serv = 0;
-
 
 bool flag_control_system_thread = false;
 
+typedef struct 
+{
+    float   p_rate,
+            i_rate,
+            d_rate;
 
+    float   error,
+            prev_error;
 
-// static THD_WORKING_AREA(waPID_action_first_serv_n, 2048);
-// static THD_FUNCTION(PID_action_first_serv_n, arg) 
-// {
-//     arg = arg;
-//     float P_control = 0;
-//     float I_control = 0;
-//     float D_control = 0;
+    float   integr_sum;
 
-//     float control_action = 0;
+} pid_ctx_t;
 
-//     float previous_value_error =0;
-//     float now_position = 0;
-//     float error = 0;
+float PID_getControl(pid_ctx_t *ctx)
+{
+    float control = 0;
 
-//     while (true)
-//     {
-//         now_position = getPositionFirstServo();
+    control += ctx->error * ctx->p_rate;
+    ctx->integr_sum += ctx->error * ctx->i_rate;
+    /* Here we have to limit maximum sum of I part */
+    control += ctx->integr_sum;
+    control += (ctx->error - ctx->prev_error) * ctx->d_rate;
+    ctx->prev_error = ctx->error;
 
-//         error = the_task_PID_first_serv - now_position;
+    return control;
+}
 
-//         P_control = error * P_coefficient_first_serv;
-//         I_control = I_control + error * I_coefficient_first_serv;
-//         D_control = (error - previous_value_error) * D_coefficient_first_serv;
+void PID_reset(pid_ctx_t *ctx)
+{
+    ctx->prev_error = 0;
+    ctx->integr_sum = 0;
+}
 
-//         previous_value_error = error;
-
-//         control_action = P_control + I_control + D_control;
-//         turnFirstMotor(control_action);
-
-//         chThdSleepSeconds(1);
-//     }
-// }
-
-static THD_WORKING_AREA(waPID_action_serv_n, 2048);
+static THD_WORKING_AREA(waPID_action_serv_n, 1024);
 static THD_FUNCTION(PID_action_serv_n, arg) 
 {
+    pid_ctx_t first_servo_ctx;
+    pid_ctx_t second_servo_ctx;
 
-    typedef struct 
-    {
-        float P_control;
-        float I_control;
-        float D_control;
+    memset( &first_servo_ctx, 0, sizeof(first_servo_ctx) );
+    memset( &second_servo_ctx, 0, sizeof(second_servo_ctx) );
 
-        float control_action;
-
-        float previous_value_error;
-        float now_position;
-        float error;
-    } paramServControl_t;
+    first_servo_ctx.p_rate = 1.3;
+    first_servo_ctx.i_rate = 0.01;
+    first_servo_ctx.d_rate = 4;
     
+    second_servo_ctx.p_rate = first_servo_ctx.p_rate;
+    second_servo_ctx.i_rate = first_servo_ctx.i_rate;
+    second_servo_ctx.d_rate = first_servo_ctx.d_rate;
+
     arg = arg;
-
-    paramServControl_t first_serv = {0,0,0,0,0,0,0};
-    paramServControl_t second_serv  = {0,0,0,0,0,0,0};
     
-    systime_t time =chVTGetSystemTimeX();
+    systime_t time = chVTGetSystemTimeX();
 
     while (true)
     {
         time += MS2ST(20);
         if(flag_control_system_thread)
         {
-            first_serv.now_position = getPositionFirstServo();
-            second_serv.now_position = getPositionSecondServo();
+            first_servo_ctx.error = the_task_PID_first_serv - getPositionFirstServo();
+            second_servo_ctx.error = the_task_PID_second_serv - getPositionSecondServo();
 
-            first_serv.error = the_task_PID_first_serv - first_serv.now_position;
-            second_serv.error = the_task_PID_second_serv - second_serv.now_position;
+            float first_servo_control = PID_getControl(&first_servo_ctx);
+            float second_servo_control = PID_getControl(&second_servo_ctx);
 
-            first_serv.P_control = first_serv.error * P_coefficient_first_serv;
-            second_serv.P_control = second_serv.error * P_coefficient_second_serv;
-
-            first_serv.I_control = first_serv.I_control + first_serv.error * I_coefficient_first_serv;
-            second_serv.I_control = second_serv.I_control + second_serv.error * I_coefficient_second_serv;
-
-            first_serv.D_control = (first_serv.error - first_serv.previous_value_error) * D_coefficient_first_serv;
-            second_serv.D_control = (second_serv.error - second_serv.previous_value_error) * D_coefficient_second_serv;
-
-            first_serv.previous_value_error = first_serv.error;
-            second_serv.previous_value_error = second_serv.error;
-
-            first_serv.control_action = first_serv.P_control + first_serv.I_control + first_serv.D_control;
-            second_serv.control_action = second_serv.P_control + second_serv.I_control + second_serv.D_control;
-
-            turnFirstMotor(first_serv.control_action);
-            turnSecondMotor(second_serv.control_action);
+            turnFirstMotor(first_servo_control);
+            turnSecondMotor(second_servo_control);
         }
         else
         {
-            first_serv.I_control = 0;
-            second_serv.I_control = 0;
-
-            first_serv.previous_value_error = 0;
-            second_serv.previous_value_error = 0;
+            PID_reset(&first_servo_ctx);
+            PID_reset(&second_servo_ctx);
 
             turnFirstMotor(0);
             turnSecondMotor(0);
         }
         
-
         chThdSleepUntil(time);
     }
 }
@@ -130,10 +107,11 @@ void initControlPID(void)
     initADC();
     initMotorPWM();
     
-
-    chThdCreateStatic(waPID_action_serv_n, sizeof(waPID_action_serv_n), NORMALPRIO, PID_action_serv_n, NULL /* arg is NULL */);
-    // chThdCreateStatic(waPID_action_second_serv_n, sizeof(waPID_action_second_serv_n), NORMALPRIO, PID_action_second_serv_n, NULL /* arg is NULL */);
-
+    chThdCreateStatic(waPID_action_serv_n, 
+                        sizeof(waPID_action_serv_n), 
+                        NORMALPRIO+1, 
+                        PID_action_serv_n, 
+                        NULL /* arg is NULL */);
 }
 
 void setTaskFirstServo(float task)

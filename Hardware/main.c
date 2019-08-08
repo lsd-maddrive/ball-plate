@@ -32,17 +32,25 @@ int main(void)
 
     float task = 0;
     int32_t value_motor_first = 0;
-    initADC();
 
-    
-    // initControlPID();
+#define TEST_CONTROL
+
+#ifdef TEST_CONTROL
+    initControlPID();
+#endif
+
+#ifdef TEST_SPEED
     initMotorPWM();
+    initADC();
+#endif
+
     while ( true )
     {   
         palToggleLine(LINE_LED1);
-        int32_t tasks = task;
-        int32_t value = getPositionFirstServo() * 10;
-        chprintf(&SD3, "W: %d, %d, %d\n", value, getRawPositionFirstServo(), tasks);
+
+        chprintf(&SD3, "W: %d, %d\n", 
+                        (int)(getPositionFirstServo()*10), 
+                        (int)(getPositionSecondServo()*10));
         
         msg_t msg  = sdGetTimeout(&SD3,MS2ST(100));
         if(msg == MSG_TIMEOUT)
@@ -54,60 +62,61 @@ int main(void)
 
         switch (val)
         {
-            
-            // case 'a':
-            //     enableThreadControl();
-            //     // palToggleLine(LINE_LED1);
-            //     break;
-                
-
-            // case 'd':
-            //     disableThreadControl();
-                
-            //     break;
-
-            // case 'q':
-            //     task += 5;
-            //     setTaskFirstServo(task);
-            //     break;
-
-            // case 'e':
-            //     task -= 5;
-            //     setTaskFirstServo(task);
-            //     break;
-
-            // case 'w':
-            //     task = 0;
-            //     setTaskFirstServo(task);
-            //     break;
-
+#ifdef TEST_CONTROL
+            case 'a':
+                enableThreadControl();
+                break;               
 
             case 's':
+                disableThreadControl();
+                break;
+
+            case 'q':
+                task += 5;
+                setTaskFirstServo(task);
+                setTaskSecondServo(task);
+                chprintf(&SD3, "Set %d\n", (int)task);
+                break;
+
+            case 'w':
+                task -= 5;
+                setTaskFirstServo(task);
+                setTaskSecondServo(task);
+                chprintf(&SD3, "Set %d\n", (int)task);
+                break;
+
+            case ' ':
+                task = 0;
+                setTaskFirstServo(task);
+                setTaskSecondServo(task);
+                chprintf(&SD3, "Reset\n");
+                break;
+#endif
+
+#ifdef TEST_SPEED
+            case 'z':
                 task += 5;
                 turnFirstMotor( task);
                 turnSecondMotor(task);
+                chprintf(&SD3, "Set %d\n", (int)task);
                 break;
 
             case 'x':
                 task -= 5;
-                turnFirstMotor( task);
+                turnFirstMotor(task);
                 turnSecondMotor(task);
+                chprintf(&SD3, "Set %d\n", (int)task);
                 break;
 
             
-            case 'z':
+            case 'c':
                 task = 0;
                 turnFirstMotor( task);
                 turnSecondMotor(task);
+                chprintf(&SD3, "Reset\n");
                 break;
+#endif
 
-        }
-
-        
-
-        
-
-        chThdSleepMilliseconds(200);
-        
+        }     
     }
 }
