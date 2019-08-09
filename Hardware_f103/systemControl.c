@@ -2,6 +2,7 @@
 #include <positionFB.h>
 #include <ch.h>
 
+#include <stdlib.h>
 #include <string.h>
 
 bool flag_control_system_thread = false;
@@ -16,6 +17,7 @@ typedef struct
             prev_error;
 
     float   integr_sum;
+    float   integr_limit;
 
 } pid_ctx_t;
 
@@ -23,7 +25,10 @@ typedef struct
 {
     uint32_t    idx;
     float       reference_val;
+    float       deadzone;
+
     pid_ctx_t   pid_ctx;
+    float       offset;
 } cs_ctx_t;
 
 
@@ -33,7 +38,13 @@ static float PID_getControl(pid_ctx_t *ctx)
 
     control += ctx->error * ctx->p_rate;
     ctx->integr_sum += ctx->error * ctx->i_rate;
+
     /* Here we have to limit maximum sum of I part */
+    if ( ctx->integr_sum > ctx->integr_limit )
+        ctx->integr_sum = ctx->integr_limit;
+    if ( ctx->integr_sum < -ctx->integr_limit )
+        ctx->integr_sum = -ctx->integr_limit;
+
     control += ctx->integr_sum;
     control += (ctx->error - ctx->prev_error) * ctx->d_rate;
     ctx->prev_error = ctx->error;
@@ -59,10 +70,14 @@ static THD_FUNCTION(CS_thread, arg)
 
     while (true)
     {
-        time += MS2ST(20);
+        time += MS2ST(10);
         if(flag_control_system_thread)
         {
-            ctx->pid_ctx.error = ctx->reference_val - positionFB_getValue(ctx->idx);
+            ctx->pid_ctx.error = (ctx->reference_val + ctx->offset) 
+                                    - positionFB_getValue(ctx->idx);
+
+            if ( abs(ctx->pid_ctx.error) < ctx->deadzone )
+                ctx->pid_ctx.error = 0;
 
             float servo_control = PID_getControl(&ctx->pid_ctx);
             motors_setPower(ctx->idx, servo_control);
@@ -86,13 +101,18 @@ void servoCS_init(void)
     for (size_t i = 0; i < SERVO_COUNT; i++)
     {
         cs_ctx_t  *cs_ctx   = &ctxs[i];
+        pid_ctx_t *pid_ctx  = &cs_ctx->pid_ctx;
         memset( cs_ctx, 0, sizeof(*cs_ctx) );
         cs_ctx->idx = i;
 
-        pid_ctx_t *pid_ctx  = &cs_ctx->pid_ctx;
+        /* ALL SETUP IS HERE */
+        cs_ctx->deadzone = 1;
+        cs_ctx->offset = 5;
+
         pid_ctx->p_rate = 1.3;
-        pid_ctx->i_rate = 0.01;
+        pid_ctx->i_rate = 0.005;
         pid_ctx->d_rate = 4;
+        pid_ctx->integr_limit = 100;
     }
 
     chThdCreateStatic(waCS_thread_0, 

@@ -5,11 +5,11 @@ PWMDriver *motor_driver_control = &PWMD1;
 
 #define MIN_VALUE_MOTOR     -100
 #define MAX_VALUE_MOTOR     100
-#define COEF_PERIOD         200
+#define COEF_PERIOD         100
 
 PWMConfig pwmConf = {
     .frequency      = 1000000,  // 1MHz
-    .period         = 20000,    // 20ms ~ 50Hz
+    .period         = 10000,    // 10ms ~ 100Hz
     .callback       = NULL,
     .channels       = {
                           {.mode = PWM_OUTPUT_ACTIVE_HIGH,    .callback = NULL},

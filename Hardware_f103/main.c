@@ -9,8 +9,6 @@
 Obtaining speed and angle values and sending them is processed.
 */
 
-
-
 int main(void)
 {
     chSysInit();
@@ -22,12 +20,14 @@ int main(void)
         .cr2 = 0,
         .cr3 = 0};
 
-    SerialDriver            *debug_driver = &SD1;
+    SerialDriver            *debug_driver = &SD2;
     BaseSequentialStream    *debug_stream = (BaseSequentialStream *)debug_driver;
 
     sdStart(debug_driver, &sd_st_cfg);
-    palSetPadMode(GPIOB, 6, PAL_MODE_STM32_ALTERNATE_PUSHPULL);
-    palSetPadMode(GPIOB, 7, PAL_MODE_STM32_ALTERNATE_PUSHPULL);
+    // palSetPadMode(GPIOA, 2, PAL_MODE_STM32_ALTERNATE_PUSHPULL);
+    // palSetPadMode(GPIOA, 3, PAL_MODE_STM32_ALTERNATE_PUSHPULL);
+
+    palSetPadMode(GPIOC, 13, PAL_MODE_OUTPUT_PUSHPULL);
 
     float task = 0;
 
@@ -46,10 +46,13 @@ int main(void)
     {   
         palTogglePad(GPIOC, 13);
 
-        chprintf(debug_stream, "W: %d, %d\n", 
+        chprintf(debug_stream, "V: %d, %d --- ", 
                         (int)(positionFB_getValue(0)*10), 
                         (int)(positionFB_getValue(1)*10));
-        
+        chprintf(debug_stream, "R: %d, %d\n", 
+                        positionFB_getRawValue(0), 
+                        positionFB_getRawValue(1));
+
         msg_t msg  = sdGetTimeout(debug_driver, MS2ST(100));
         if(msg == MSG_TIMEOUT)
         {
@@ -63,10 +66,12 @@ int main(void)
 #ifdef TEST_CONTROL
             case 'a':
                 servoCS_enable();
+                chprintf(debug_stream, "Enabled\n");
                 break;               
 
             case 's':
                 servoCS_disable();
+                chprintf(debug_stream, "Disabled\n");
                 break;
 
             case 'q':

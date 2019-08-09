@@ -5,9 +5,7 @@
 #include <common.h>
 
 void positionFB_init(void);
-int32_t positionFB_getValue(uint32_t idx);
-
-int32_t getRawPositionSecondServo(void);
-int32_t getRawPositionFirstServo(void);
+float positionFB_getValue(uint32_t idx);
+int32_t positionFB_getRawValue(uint32_t idx);
 
 #endif //_POSITIONFB_
