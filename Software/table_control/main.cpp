@@ -12,8 +12,10 @@
 
 #include <iostream>
 #include <thread>
+#include <mutex>
 
 #include <boost/program_options.hpp>
+#include <boost/asio.hpp>
 
 class PlaneListener
 {
@@ -27,6 +29,7 @@ PlaneListener::PlaneListener()
 
 using namespace std;
 namespace po = boost::program_options;
+namespace asio = boost::asio;
 
 // 700 - 3300
 
@@ -40,6 +43,16 @@ struct Point
     Point operator-(const Point &b) const
     {
         return Point(x-b.x, y-b.y);
+    }
+
+    Point operator+(const Point &b) const
+    {
+        return Point(x+b.x, y+b.y);
+    }
+
+    Point operator*(const float scal) const
+    {
+        return Point(x*scal, y*scal);
     }
 };
 
@@ -63,12 +76,16 @@ public:
     static Point adc2normalPoint(int32_t x, int32_t y);
 
 private:
+    asio::io_service io;
+    asio::serial_port m_port;
+
     void threadRoutine();
     bool m_isActive;
     bool m_isPlaced;
 
     Point m_pos;
 
+    mutex m_io_mutex;
     thread _thread;
 
     static constexpr double min_x = 700;
@@ -78,11 +95,15 @@ private:
 };
 
 ControlSystem::ControlSystem() : 
-    m_isActive(true), m_isPlaced(false)
+    m_isActive(true), m_isPlaced(false),
+    m_port(io, "/dev/serial/by-id/usb-STMicroelectronics_ChibiOS_RT_Virtual_COM_Port_404-if00")
 {
     _thread = thread(&ControlSystem::threadRoutine, this);
 
     cout << "Thread created" << endl;
+
+    if ( !m_port.is_open() )
+        throw logic_error("Failed to open serial port");
 }
 
 ControlSystem::~ControlSystem()
@@ -92,12 +113,22 @@ ControlSystem::~ControlSystem()
 
 void ControlSystem::resetBall()
 {
+    lock_guard<std::mutex> lock(m_io_mutex);
+
     m_isPlaced = false;
+    uint8_t buffer[3] = {167, 253};
+    asio::write(m_port, asio::buffer("$", 1));
+    asio::write(m_port, asio::buffer(buffer, sizeof(buffer)));
 }
 
 void ControlSystem::placeBall()
 {
+    lock_guard<std::mutex> lock(m_io_mutex);
+    
     m_isPlaced = true;
+    uint8_t buffer[3] = {165, 252};
+    asio::write(m_port, asio::buffer("%", 1));
+    asio::write(m_port, asio::buffer(buffer, sizeof(buffer)));
 }
 
 Point ControlSystem::adc2normalPoint(int32_t x, int32_t y)
@@ -125,13 +156,7 @@ void ControlSystem::updateBallPosition(Point &pos)
 
     m_pos = pos;
 
-    Point reference;
-
-    Point error = reference - m_pos;
-
-
-
-    cout << m_pos << " / " << error << endl;
+    // cout << m_pos << endl;
 }
 
 void ControlSystem::threadRoutine()
@@ -145,8 +170,42 @@ void ControlSystem::threadRoutine()
     {
         currentTime = chrono::system_clock::now();
         nextPeriodTime = currentTime + intervalMillis;
+        
+        m_io_mutex.lock();
 
-        cout << "Hello!" << endl;
+        static Point integr_sum;
+
+        if ( m_isPlaced )
+        {
+            Point reference;
+            Point error = reference - m_pos;
+
+            static Point prev_error;
+
+            const double p_rate = 15;
+            const double d_rate = 1000;
+            const double i_rate = 0.003;
+
+            integr_sum = integr_sum + error * i_rate;
+
+            Point incline = error * p_rate + (error - prev_error) * d_rate + integr_sum;
+            prev_error = error;
+
+            /* Minus - because of mechanics */
+            float buffer[2] = { -incline.x, -incline.y };
+
+            asio::write(m_port, asio::buffer("#", 1));
+            asio::write(m_port, asio::buffer(buffer, sizeof(buffer)));
+
+            cout << "Send: " << buffer[0] << " / " << buffer[1]
+                    << " / Pos: " << m_pos << endl;
+        }
+        else
+        {
+            integr_sum = Point();
+        }
+
+        m_io_mutex.unlock();
 
         this_thread::sleep_until(nextPeriodTime);
     }

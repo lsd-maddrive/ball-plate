@@ -1,13 +1,122 @@
 #include <ch.h>
 #include <hal.h>
-
-#include <positionFB.h>
 #include <chprintf.h>
-#include <systemControl.h>
-#include <motorControl.h>
+#include <string.h>
+
+#include "usbcfg.h"
+
+#include "positionFB.h"
+#include "systemControl.h"
+#include "motorControl.h"
 /* For module test.
 Obtaining speed and angle values and sending them is processed.
 */
+
+SerialDriver            *debug_driver = &SD2;
+BaseSequentialStream    *debug_stream = (BaseSequentialStream *)&SD2;
+
+bool                program_control = false;
+virtual_timer_t     prog_watchdog_vt;
+
+static void wdg_prog_cb( void *arg )
+{
+    arg = arg;  // to avoid warnings
+
+    program_control = false;
+    chprintf(debug_stream, "Program control disabled\n");
+}
+
+static void check_prog_control( void )
+{
+    // chVTSet( &prog_watchdog_vt, MS2ST( 500 ), wdg_prog_cb, NULL );
+}
+
+static void reset_prog_control( void )
+{
+    // chVTReset( &prog_watchdog_vt );
+}
+
+static THD_WORKING_AREA(waUSB_rcvr, 2048);
+static THD_FUNCTION(USB_rcvr, arg)
+{
+    arg = arg;
+
+    /* USB */
+    sduObjectInit(&SDU1);
+    sduStart(&SDU1, &serusbcfg);
+
+    usbDisconnectBus(serusbcfg.usbp);
+    chThdSleepMilliseconds(1500);
+    usbStart(serusbcfg.usbp, &usbcfg);
+    usbConnectBus(serusbcfg.usbp);  
+
+    chVTObjectInit(&prog_watchdog_vt);
+
+    while ( 1 )
+    {
+        if (SDU1.config->usbp->state == USB_ACTIVE)
+        {
+            msg_t usb_msg = chnGetTimeout(&SDU1, TIME_IMMEDIATE);
+            if ( usb_msg != MSG_TIMEOUT && usb_msg != MSG_RESET )
+            {
+                char usb_val = usb_msg;
+                if ( usb_val == '#' )
+                {
+                    float buffer[2];
+                    size_t result = chnRead(&SDU1, buffer, sizeof(buffer));
+                    if ( result > 0 )
+                    {
+                        setTaskFirstServo(buffer[0]);
+                        setTaskSecondServo(buffer[1]);
+
+                        // chprintf(debug_stream, "T: %d %d\n", 
+                        //             (int)(buffer[0] * 10),
+                        //             (int)(buffer[1] * 10) );
+
+                        check_prog_control();
+                    }
+                }
+                else if ( usb_val == '$' )
+                {
+                    uint8_t ideal[2] = {167, 253};
+                    uint8_t buffer[2];
+                    size_t result = chnRead(&SDU1, buffer, sizeof(buffer));
+                    if ( result > 0 )
+                    {
+                        if ( !memcmp(ideal, buffer, sizeof(ideal)) )
+                        {   
+                            program_control = false;
+                            setTaskFirstServo(0);
+                            setTaskSecondServo(0);
+                            chprintf(debug_stream, "Reset table\n");
+
+                            reset_prog_control();
+                        } 
+                    }
+                }
+                else if ( usb_val == '%' )
+                {
+                    uint8_t ideal[2] = {165, 252};
+                    uint8_t buffer[2];
+                    size_t result = chnRead(&SDU1, buffer, sizeof(buffer));
+                    if ( result > 0 )
+                    {
+                        if ( !memcmp(ideal, buffer, sizeof(ideal)) )
+                        {  
+                            program_control = true;
+                            servoCS_enable();
+                            chprintf(debug_stream, "Access table\n");
+
+                            check_prog_control();
+                        } 
+                    }
+                }
+            }
+        }
+
+        chThdSleepMilliseconds(2);
+    }
+}
 
 int main(void)
 {
@@ -19,9 +128,6 @@ int main(void)
         .cr1 = 0,
         .cr2 = 0,
         .cr3 = 0};
-
-    SerialDriver            *debug_driver = &SD2;
-    BaseSequentialStream    *debug_stream = (BaseSequentialStream *)debug_driver;
 
     sdStart(debug_driver, &sd_st_cfg);
     // palSetPadMode(GPIOA, 2, PAL_MODE_STM32_ALTERNATE_PUSHPULL);
@@ -42,6 +148,12 @@ int main(void)
     initADC();
 #endif
 
+    chThdCreateStatic(waUSB_rcvr, 
+                    sizeof(waUSB_rcvr), 
+                    NORMALPRIO+1, 
+                    USB_rcvr, 
+                    NULL);
+
     while ( true )
     {   
         palTogglePad(GPIOC, 13);
@@ -53,13 +165,12 @@ int main(void)
                         positionFB_getRawValue(0), 
                         positionFB_getRawValue(1));
 
-        msg_t msg  = sdGetTimeout(debug_driver, MS2ST(100));
-        if(msg == MSG_TIMEOUT)
-        {
-            continue;
-        }
-        
+        msg_t msg  = sdGetTimeout(debug_driver, MS2ST(100));     
         char val = msg;
+
+        /* Disable handy control when program has access */
+        if ( program_control )
+            continue;
 
         switch (val)
         {
@@ -120,6 +231,6 @@ int main(void)
                 break;
 #endif
 
-        }     
+        }   
     }
 }

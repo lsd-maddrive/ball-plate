@@ -5,7 +5,7 @@ set (CMAKE_CXX_STANDARD 11)
 set(Boost_USE_MULTITHREADED      ON)
 
 find_package(Boost REQUIRED COMPONENTS
-                program_options
+                program_options system
                 )
 
 add_executable(${PROJECT_NAME} main.cpp)

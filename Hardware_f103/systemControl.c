@@ -5,6 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MAX_REFERENCE_VALUE     40
+#define MIN_REFERENCE_VALUE     -MAX_REFERENCE_VALUE
+
 bool flag_control_system_thread = false;
 
 typedef struct 
@@ -117,24 +120,28 @@ void servoCS_init(void)
 
     chThdCreateStatic(waCS_thread_0, 
                         sizeof(waCS_thread_0), 
-                        NORMALPRIO+1, 
+                        NORMALPRIO+2, 
                         CS_thread, 
                         &ctxs[0]);
 
     chThdCreateStatic(waCS_thread_1, 
                         sizeof(waCS_thread_1), 
-                        NORMALPRIO+1, 
+                        NORMALPRIO+2, 
                         CS_thread, 
                         &ctxs[1]);
 }
 
 void setTaskFirstServo(float task)
 {
+    task = CLIP_VALUE(task, MIN_REFERENCE_VALUE, MAX_REFERENCE_VALUE);
+
     ctxs[0].reference_val = task;
 }
 
 void setTaskSecondServo(float task)
 {
+    task = CLIP_VALUE(task, MIN_REFERENCE_VALUE, MAX_REFERENCE_VALUE);
+
     ctxs[1].reference_val = task;
 }
 
