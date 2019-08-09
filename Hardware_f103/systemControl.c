@@ -73,7 +73,7 @@ static THD_FUNCTION(CS_thread, arg)
 
     while (true)
     {
-        time += MS2ST(10);
+        time += MS2ST(5);
         if(flag_control_system_thread)
         {
             ctx->pid_ctx.error = (ctx->reference_val + ctx->offset) 
@@ -110,13 +110,15 @@ void servoCS_init(void)
 
         /* ALL SETUP IS HERE */
         cs_ctx->deadzone = 1;
-        cs_ctx->offset = 5;
 
-        pid_ctx->p_rate = 1.3;
+        pid_ctx->p_rate = 2;
         pid_ctx->i_rate = 0.005;
-        pid_ctx->d_rate = 4;
+        pid_ctx->d_rate = 20;
         pid_ctx->integr_limit = 100;
     }
+
+    ctxs[0].offset = 12;
+    ctxs[1].offset = -10;
 
     chThdCreateStatic(waCS_thread_0, 
                         sizeof(waCS_thread_0), 

@@ -5,7 +5,7 @@
 #define TIMER_EXT_TRIGGER       (&GPTD3)
 
 #define ADC1_NUM_CHANNELS   2
-#define ADC1_BUF_DEPTH      20
+#define ADC1_BUF_DEPTH      50
 
 #define ADC_LOWER_LIMIT     100.
 #define ADC_UPPER_LIMIT     4000.
@@ -22,7 +22,7 @@ float coefficient_b_for_line = 0;
 float coefficient_k_for_line = 0;
 // Cons for GPT PA4
 static const GPTConfig gptcfg = {
-    .frequency =  100000,
+    .frequency =  1000000,
     .callback  =  NULL,
     .cr2       =  TIM_CR2_MMS_1,  
     .dier      =  0U
@@ -31,6 +31,8 @@ static const GPTConfig gptcfg = {
 static void adccallback_1_ADC(ADCDriver *adcp, adcsample_t *buffer, size_t n)
 {
     average_value_of_the_first_ADC = 0;
+    average_value_of_the_second_ADC = 0;
+
     for(size_t i = 0; i < n; i+=2)
     {
         average_value_of_the_first_ADC += buffer[i];
@@ -79,7 +81,7 @@ void positionFB_init(void)
     
     adcStartConversion(&ADCD1, &adcgrpcfg1, samples1, ADC1_BUF_DEPTH);
 
-    gptStartContinuous(TIMER_EXT_TRIGGER, gptcfg.frequency/1000);
+    gptStartContinuous(TIMER_EXT_TRIGGER, gptcfg.frequency/10000);
 
     coefficient_b_for_line = (((-1)*ADC_LOWER_LIMIT*(MAX_VALUE_PERCENT_ADC - MIN_VALUE_PERCENT_ADC))/
                                 (ADC_UPPER_LIMIT - ADC_LOWER_LIMIT)) + MIN_VALUE_PERCENT_ADC;

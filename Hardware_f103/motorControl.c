@@ -9,7 +9,7 @@ PWMDriver *motor_driver_control = &PWMD1;
 
 PWMConfig pwmConf = {
     .frequency      = 1000000,  // 1MHz
-    .period         = 10000,    // 10ms ~ 100Hz
+    .period         = 5000,    // 5ms ~ 200Hz
     .callback       = NULL,
     .channels       = {
                           {.mode = PWM_OUTPUT_ACTIVE_HIGH,    .callback = NULL},

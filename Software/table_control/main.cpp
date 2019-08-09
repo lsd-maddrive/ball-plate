@@ -182,9 +182,9 @@ void ControlSystem::threadRoutine()
 
             static Point prev_error;
 
-            const double p_rate = 15;
-            const double d_rate = 1000;
-            const double i_rate = 0.003;
+            const double p_rate = 20;
+            const double d_rate = 400;
+            const double i_rate = 0.000;
 
             integr_sum = integr_sum + error * i_rate;
 
@@ -197,8 +197,8 @@ void ControlSystem::threadRoutine()
             asio::write(m_port, asio::buffer("#", 1));
             asio::write(m_port, asio::buffer(buffer, sizeof(buffer)));
 
-            cout << "Send: " << buffer[0] << " / " << buffer[1]
-                    << " / Pos: " << m_pos << endl;
+            // cout << "Send: " << buffer[0] << " / " << buffer[1]
+                    // << " / Pos: " << m_pos << endl;
         }
         else
         {
