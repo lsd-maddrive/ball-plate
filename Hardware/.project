@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>Test</name>
+	<name>STM32F767ZI_ChibiOS_template</name>
 	<comment></comment>
 	<projects>
 	</projects>
@@ -38,7 +38,7 @@
 	<variableList>
 		<variable>
 			<name>CHIBIOS</name>
-			<value>$%7BPARENT-1-ECLIPSE_HOME%7D/chibios176</value>
+			<value>$%7BPARENT-1-ECLIPSE_HOME%7D/chibios</value>
 		</variable>
 	</variableList>
 </projectDescription>
