@@ -1,19 +1,15 @@
-*****************************************************************************
-** ChibiOS/RT port for ARM-Cortex-M7 STM32F767.                            **
-*****************************************************************************
+# Firmware for STM32F103C8T6 uC
 
-** TARGET **
+## Pinout
+- PB12 - Motor1 A
+- PB13 - Motor1 B
+- PB14 - Motor2 A
+- PB15 - Motor2 B
+- PA8  - Motor1 PWM
+- PA9  - Motor2 PWM
 
-The template runs on an STM32 Nucleo144-F767ZI board.
-ChibiOS version 17 is used (branch - stable_17.6.x)
+- PA0  - Potentiometer Servo1
+- PA1  - Potentiometer Servo2
 
-** Notes **
-
-The template is based on the ChibiOS/RT demos for STM32 Nucleo144-F767ZI
-
-Some files used by the demo are not part of ChibiOS/RT but are copyright of
-ST Microelectronics and are licensed under a different license.
-Also note that not all the files present in the ST library are distributed
-with ChibiOS/RT, you can find the whole library on the ST web site:
-
-                             http://www.st.com
+- PA2  - Debug UART TX
+- PA3  - Debug UART RX

@@ -1,135 +1,123 @@
 #include <motorControl.h>
 #include <positionFB.h>
-#include <motorControl.h>
-#include <hal.h>
 
+#include <stdlib.h>
 #include <string.h>
 
-float previous_value_error = 0;
+#include "control_pid.h"
 
-float the_task_PID_first_serv = 0;
-float the_task_PID_second_serv = 0;
-
-float P_coefficient_first_serv = 0.3;
-float I_coefficient_first_serv = 0.01;
-float D_coefficient_first_serv = 0;
-
-float P_coefficient_second_serv = 0.3;
-float I_coefficient_second_serv = 0.01;
-float D_coefficient_second_serv = 0;
+#define MAX_REFERENCE_VALUE     40
+#define MIN_REFERENCE_VALUE     -MAX_REFERENCE_VALUE
 
 bool flag_control_system_thread = false;
 
-typedef struct 
+typedef struct
 {
-    float   p_rate,
-            i_rate,
-            d_rate;
+    uint32_t    idx;
+    float       reference_val;
+    float       deadzone;
 
-    float   error,
-            prev_error;
+    pid_ctx_t   pid_ctx;
+    float       offset;
+} cs_ctx_t;
 
-    float   integr_sum;
+cs_ctx_t ctxs[SERVO_COUNT];
 
-} pid_ctx_t;
-
-float PID_getControl(pid_ctx_t *ctx)
+static THD_WORKING_AREA(waCS_thread_0, 1024);
+static THD_WORKING_AREA(waCS_thread_1, 1024);
+static THD_FUNCTION(CS_thread, arg) 
 {
-    float control = 0;
-
-    control += ctx->error * ctx->p_rate;
-    ctx->integr_sum += ctx->error * ctx->i_rate;
-    /* Here we have to limit maximum sum of I part */
-    control += ctx->integr_sum;
-    control += (ctx->error - ctx->prev_error) * ctx->d_rate;
-    ctx->prev_error = ctx->error;
-
-    return control;
-}
-
-void PID_reset(pid_ctx_t *ctx)
-{
-    ctx->prev_error = 0;
-    ctx->integr_sum = 0;
-}
-
-static THD_WORKING_AREA(waPID_action_serv_n, 1024);
-static THD_FUNCTION(PID_action_serv_n, arg) 
-{
-    pid_ctx_t first_servo_ctx;
-    pid_ctx_t second_servo_ctx;
-
-    memset( &first_servo_ctx, 0, sizeof(first_servo_ctx) );
-    memset( &second_servo_ctx, 0, sizeof(second_servo_ctx) );
-
-    first_servo_ctx.p_rate = 1.3;
-    first_servo_ctx.i_rate = 0.01;
-    first_servo_ctx.d_rate = 4;
-    
-    second_servo_ctx.p_rate = first_servo_ctx.p_rate;
-    second_servo_ctx.i_rate = first_servo_ctx.i_rate;
-    second_servo_ctx.d_rate = first_servo_ctx.d_rate;
-
-    arg = arg;
+    cs_ctx_t *ctx = arg;
     
     systime_t time = chVTGetSystemTimeX();
 
     while (true)
     {
-        time += MS2ST(20);
+        time += MS2ST(5);
         if(flag_control_system_thread)
         {
-            first_servo_ctx.error = the_task_PID_first_serv - getPositionFirstServo();
-            second_servo_ctx.error = the_task_PID_second_serv - getPositionSecondServo();
+            ctx->pid_ctx.error = (ctx->reference_val + ctx->offset) 
+                                    - positionFB_getValue(ctx->idx);
 
-            float first_servo_control = PID_getControl(&first_servo_ctx);
-            float second_servo_control = PID_getControl(&second_servo_ctx);
+            if ( abs(ctx->pid_ctx.error) < ctx->deadzone )
+                ctx->pid_ctx.error = 0;
 
-            turnFirstMotor(first_servo_control);
-            turnSecondMotor(second_servo_control);
+            float servo_control = PID_getControl(&ctx->pid_ctx);
+            motors_setPower(ctx->idx, servo_control);
         }
         else
         {
-            PID_reset(&first_servo_ctx);
-            PID_reset(&second_servo_ctx);
-
-            turnFirstMotor(0);
-            turnSecondMotor(0);
+            PID_reset(&ctx->pid_ctx);
+            motors_setPower(ctx->idx, 0);
         }
         
         chThdSleepUntil(time);
     }
 }
 
-
-void initControlPID(void)
+void servoCS_setOffset( uint32_t idx, float offset )
 {
-    initADC();
-    initMotorPWM();
+    if (idx >= SERVO_COUNT)
+        return;
+
+    ctxs[idx].offset = offset;
+}
+
+void servoCS_init(void)
+{
+    positionFB_init();
+    motors_init();
     
-    chThdCreateStatic(waPID_action_serv_n, 
-                        sizeof(waPID_action_serv_n), 
-                        NORMALPRIO+1, 
-                        PID_action_serv_n, 
-                        NULL /* arg is NULL */);
+    for (size_t i = 0; i < SERVO_COUNT; i++)
+    {
+        cs_ctx_t  *cs_ctx   = &ctxs[i];
+        pid_ctx_t *pid_ctx  = &cs_ctx->pid_ctx;
+        PID_init(pid_ctx);
+
+        memset( cs_ctx, 0, sizeof(*cs_ctx) );
+        cs_ctx->idx = i;
+
+        /* ALL SETUP IS HERE */
+        cs_ctx->deadzone = 1;
+
+        pid_ctx->p_rate = 2;
+        pid_ctx->i_rate = 0.005;
+        pid_ctx->d_rate = 20;
+        pid_ctx->integr_limit = 100;
+    }
+
+    ctxs[0].offset = 0;
+    ctxs[1].offset = 0;
+
+    chThdCreateStatic(waCS_thread_0, 
+                        sizeof(waCS_thread_0), 
+                        NORMALPRIO+2, 
+                        CS_thread, 
+                        &ctxs[0]);
+
+    chThdCreateStatic(waCS_thread_1, 
+                        sizeof(waCS_thread_1), 
+                        NORMALPRIO+2, 
+                        CS_thread, 
+                        &ctxs[1]);
 }
 
-void setTaskFirstServo(float task)
+void servoCS_setReference(uint32_t idx, float ref)
 {
-    the_task_PID_first_serv = task;
+    if ( idx >= SERVO_COUNT )
+        return;
+
+    ref = CLIP_VALUE(ref, MIN_REFERENCE_VALUE, MAX_REFERENCE_VALUE);
+
+    ctxs[idx].reference_val = ref;
 }
 
-void setTaskSecondServo(float task)
-{
-    the_task_PID_second_serv = task;
-}
-
-void enableThreadControl(void)
+void servoCS_enable(void)
 {
     flag_control_system_thread = true;
 }
 
-void disableThreadControl(void)
+void servoCS_disable(void)
 {
     flag_control_system_thread = false;
 }

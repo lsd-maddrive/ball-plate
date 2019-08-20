@@ -1,23 +1,10 @@
 #ifndef _MOTORCONTROL_
 #define _MOTORCONTROL_
 
-
 #include <stdint.h>
+#include <common.h>
 
-
-#define CLIP_VALUE(x, min, max) ( (x) < (min) ? (min) :     \
-                                  (x) > (max) ? (max) : (x) )
-
-
-void initMotorPWM( void );
-
-void turnFirstMotor(float value_first_motor);
-void turnSecondMotor(float value_second_motor);
-
-
-
-
-
-
+void motors_init( void );
+void motors_setPower( uint32_t motor_idx, float power );
 
 #endif //_COMMUNICATION_

@@ -1,22 +1,15 @@
 #ifndef _SYSTEMCONTROL_
 #define _SYSTEMCONTROL_
 
-
 #include <stdint.h>
+#include <common.h>
 
-#define CLIP_VALUE(x, min, max) ( (x) < (min) ? (min) :     \
-                                  (x) > (max) ? (max) : (x) )
+void servoCS_init(void);
+void servoCS_setReference(uint32_t idx, float ref);
+void servoCS_setOffset( uint32_t idx, float offset );
 
-
-
-void initControlPID(void);
-
-void setTaskFirstServo(float task);
-void setTaskSecondServo(float task);
-
-void enableThreadControl(void);
-void disableThreadControl(void);
-
+void servoCS_enable(void);
+void servoCS_disable(void);
 
 
 #endif //_SYSTEMCONTROL_

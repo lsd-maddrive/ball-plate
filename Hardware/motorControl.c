@@ -1,114 +1,91 @@
 #include <motorControl.h>
 #include <hal.h>
 
+PWMDriver *motor_driver_control = &PWMD4; 
+
 #define MIN_VALUE_MOTOR     -100
 #define MAX_VALUE_MOTOR     100
-#define COEF_PERIOD         200
-
-#define FIRST_MOTOR_IDX   2
-#define SECOND_MOTOR_IDX  3
-
+#define COEF_PERIOD         25
 
 PWMConfig pwmConf = {
     .frequency      = 1000000,  // 1MHz
-    .period         = 20000,    // 20ms ~ 50Hz
+    .period         = 2500,    // 2.5ms ~ 400Hz
     .callback       = NULL,
     .channels       = {
-                          {.mode = PWM_OUTPUT_DISABLED,    .callback = NULL},
-                          {.mode = PWM_OUTPUT_DISABLED,    .callback = NULL},
                           {.mode = PWM_OUTPUT_ACTIVE_HIGH,    .callback = NULL},
-                          {.mode = PWM_OUTPUT_ACTIVE_HIGH,    .callback = NULL}
+                          {.mode = PWM_OUTPUT_ACTIVE_HIGH,    .callback = NULL},
+                          {.mode = PWM_OUTPUT_DISABLED,    .callback = NULL},
+                          {.mode = PWM_OUTPUT_DISABLED,    .callback = NULL}
                       },
     .cr2            = 0,
     .dier           = 0
 };
 
-PWMDriver *motor_driver_control = &PWMD2; 
-
-
-// PWMDriver *pwm_hrz_dr = &PWMD2;
-// PWMDriver *pwm_vrt_dr = &PWMD3;
-
-void initMotorPWM( void )
-{
-    palSetPadMode( GPIOB, 10, PAL_MODE_ALTERNATE(1));
-    palSetPadMode( GPIOB, 11, PAL_MODE_ALTERNATE(1));
-
-#define FIRST_MOTOR_A   PAL_LINE(GPIOE, 12)
-#define FIRST_MOTOR_B   PAL_LINE(GPIOE, 10)
-#define SECOND_MOTOR_A  PAL_LINE(GPIOE, 15)
-#define SECOND_MOTOR_B  PAL_LINE(GPIOE, 14)
-
-    palSetLineMode( FIRST_MOTOR_A, PAL_MODE_OUTPUT_PUSHPULL);
-    palSetLineMode( FIRST_MOTOR_B, PAL_MODE_OUTPUT_PUSHPULL);
-    palSetLineMode( SECOND_MOTOR_A, PAL_MODE_OUTPUT_PUSHPULL);
-    palSetLineMode( SECOND_MOTOR_B, PAL_MODE_OUTPUT_PUSHPULL);
+typedef struct {
+    ioline_t    line_a,
+                line_b;
     
+    uint32_t    idx;
+} motor_ctx_t;
+
+motor_ctx_t     motors[SERVO_COUNT];
+
+void motors_init( void )
+{
+    palSetPadMode( GPIOD, 12, PAL_MODE_ALTERNATE(2));
+    palSetPadMode( GPIOD, 13, PAL_MODE_ALTERNATE(2));
+
+    motors[0].idx = 0;
+    motors[1].idx = 1;
+
+    motors[0].line_a    = PAL_LINE(GPIOE, 3);
+    motors[0].line_b    = PAL_LINE(GPIOF, 7);
+    motors[1].line_a    = PAL_LINE(GPIOF, 8);
+    motors[1].line_b    = PAL_LINE(GPIOF, 9);
+
     pwmStart( motor_driver_control, &pwmConf );
 
-    pwmDisableChannel( motor_driver_control, FIRST_MOTOR_IDX );
-    pwmDisableChannel( motor_driver_control, SECOND_MOTOR_IDX );
-}
-
-void turnFirstMotor(float value_first_motor){
-
-    value_first_motor = CLIP_VALUE(value_first_motor, MIN_VALUE_MOTOR, MAX_VALUE_MOTOR);
-    value_first_motor = value_first_motor * COEF_PERIOD;
-    
-    if(value_first_motor > 0)
+    for (size_t i = 0; i < SERVO_COUNT; i++)
     {
-        palSetLine(FIRST_MOTOR_A);
-        palClearLine(FIRST_MOTOR_B);
+        palSetLineMode( motors[i].line_a, PAL_MODE_OUTPUT_PUSHPULL);
+        palSetLineMode( motors[i].line_b, PAL_MODE_OUTPUT_PUSHPULL);
 
-        pwmEnableChannel( motor_driver_control, FIRST_MOTOR_IDX, value_first_motor );
-    }
-    else if (value_first_motor < 0)
-    {
-        value_first_motor = value_first_motor * (-1);
-
-        palSetLine(FIRST_MOTOR_B);
-        palClearLine(FIRST_MOTOR_A);
-
-        pwmEnableChannel( motor_driver_control, FIRST_MOTOR_IDX, value_first_motor );
-    }
-    else
-    {
-        palClearLine(FIRST_MOTOR_A);
-        palClearLine(FIRST_MOTOR_B);
-
-        pwmDisableChannel( motor_driver_control, FIRST_MOTOR_IDX );
+        motors_setPower(0, i);
     }
 }
 
-
-void turnSecondMotor(float value_second_motor)
+void motors_setPower(uint32_t motor_idx, float power)
 {
-    value_second_motor = CLIP_VALUE(value_second_motor, MIN_VALUE_MOTOR, MAX_VALUE_MOTOR);
-    value_second_motor = value_second_motor * COEF_PERIOD;
-    
-    if(value_second_motor > 0)
-    {
-        palSetLine(SECOND_MOTOR_A);
-        palClearLine(SECOND_MOTOR_B);
+    if (motor_idx >= SERVO_COUNT)
+        return;
 
-        pwmEnableChannel( motor_driver_control, SECOND_MOTOR_IDX, value_second_motor );
+    motor_ctx_t *ctx = &motors[motor_idx];
+
+    power = CLIP_VALUE(power, MIN_VALUE_MOTOR, MAX_VALUE_MOTOR);
+    power = power * COEF_PERIOD;
+
+    if(power > 0)
+    {
+        palSetLine(ctx->line_a);
+        palClearLine(ctx->line_b);
+
+        pwmEnableChannel( motor_driver_control, ctx->idx, power );
     }
-    else if (value_second_motor < 0)
+    else if (power < 0)
     {
-        value_second_motor = value_second_motor * (-1);
+        power = power * (-1);
 
-        palSetLine(SECOND_MOTOR_B);
-        palClearLine(SECOND_MOTOR_A);
+        palSetLine(ctx->line_b);
+        palClearLine(ctx->line_a);
 
-        pwmEnableChannel( motor_driver_control, SECOND_MOTOR_IDX, value_second_motor );
+        pwmEnableChannel( motor_driver_control, ctx->idx, power );
     }
     else
     {
-        palClearLine(SECOND_MOTOR_A);
-        palClearLine(SECOND_MOTOR_B);
+        palClearLine(ctx->line_a);
+        palClearLine(ctx->line_b);
 
-        pwmDisableChannel( motor_driver_control, SECOND_MOTOR_IDX );
+        pwmDisableChannel( motor_driver_control, ctx->idx );
     }
 }
-
 
