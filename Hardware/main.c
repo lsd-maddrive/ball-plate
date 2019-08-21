@@ -43,6 +43,7 @@ int32_t panel_get_adc_value(void)
 
     if ( msg != MSG_OK )
     {
+        // chprintf(debug_stream, "Err: %d\n", msg);
         return 0;
     }
 
@@ -50,6 +51,8 @@ int32_t panel_get_adc_value(void)
     {
         value += samples[i];
     }
+
+    // chprintf(debug_stream, "Val: %d\n", msg);
 
     return value / ADC_PANEL_BUF_DEPTH;
 }
@@ -61,27 +64,7 @@ ioline_t panel_lines[] = {
     PAL_LINE(GPIOD, 3)
 };
 
-/* Mode InvY */
-// palClearLine(panel_lines[0]);
-// palClearLine(panel_lines[1]);
-// palSetLine(panel_lines[2]);
-// palSetLine(panel_lines[3]);
-
-// /* Mode InvX */
-// palSetLine(panel_lines[0]);
-// palClearLine(panel_lines[1]);
-// palSetLine(panel_lines[2]);
-// palClearLine(panel_lines[3]);
-
-static const GPTConfig gptcfg = {
-    .frequency =  27000000, // 27 MHz
-    .callback  =  NULL,
-    .cr2       =  0,  
-    .dier      =  0
-};
-
-#define PANEL_ADC_STABILITY_TIME_US         100
-#define PANEL_ADC_STABILITY_TIME_GPT_TCK    27
+#define PANEL_ADC_STABILITY_TIME_US         200
 #define PANEL_MAX_ADC_VALUE     2900
 #define PANEL_MIN_ADC_VALUE     1100
 
@@ -89,40 +72,78 @@ static float PANEL_K_VAL;
 
 int32_t panelRawX = 0;
 int32_t panelRawY = 0;
+int32_t panelRawInvX = 0;
+int32_t panelRawInvY = 0;
+bool panelIsPressed = false;
+
+void panel_clearLines(void)
+{
+    for ( size_t i = 0; i < sizeof(panel_lines) / sizeof(*panel_lines); i++ )
+    {
+        palClearLine( panel_lines[i] );
+    }
+}
 
 bool panel_isPressed(void)
 {
-    palClearLine(panel_lines[0]);
+    panel_clearLines();
+
+    chThdSleepMicroseconds(PANEL_ADC_STABILITY_TIME_US);
+
+    panelIsPressed = panel_get_adc_value() != 0;
+
+    return panelIsPressed;
+}
+
+int32_t panel_getRawInvX(void)
+{
+    /* Mode X */
+    palSetLine(panel_lines[0]);
+    palSetLine(panel_lines[2]);
     palClearLine(panel_lines[1]);
-    palClearLine(panel_lines[2]);
     palClearLine(panel_lines[3]);
 
     chThdSleepMicroseconds(PANEL_ADC_STABILITY_TIME_US);
-    // gptPolledDelay( &GPTD3, PANEL_ADC_STABILITY_TIME_GPT_TCK );
 
-    int32_t panelRaw = panel_get_adc_value();
-    return panelRaw != 0;
+    panelRawInvX = panel_get_adc_value();
+
+    panel_clearLines();
+
+    return panelRawInvX;
 }
 
 int32_t panel_getRawX(void)
 {
     /* Mode X */
-    palClearLine(panel_lines[0]);
     palSetLine(panel_lines[1]);
-    palClearLine(panel_lines[2]);
     palSetLine(panel_lines[3]);
+    palClearLine(panel_lines[0]);
+    palClearLine(panel_lines[2]);
 
     chThdSleepMicroseconds(PANEL_ADC_STABILITY_TIME_US);
-    // gptPolledDelay( &GPTD3, PANEL_ADC_STABILITY_TIME_GPT_TCK );
 
     panelRawX = panel_get_adc_value();
 
-    palClearLine(panel_lines[0]);
-    palClearLine(panel_lines[1]);
-    palClearLine(panel_lines[2]);
-    palClearLine(panel_lines[3]);
+    panel_clearLines();
 
     return panelRawX;
+}
+
+int32_t panel_getRawInvY(void)
+{
+    /* Mode Y */
+    palSetLine(panel_lines[2]);
+    palSetLine(panel_lines[3]);
+    palClearLine(panel_lines[0]);
+    palClearLine(panel_lines[1]);
+
+    chThdSleepMicroseconds(PANEL_ADC_STABILITY_TIME_US);
+    
+    panelRawInvY = panel_get_adc_value();
+
+    panel_clearLines();
+
+    return panelRawInvY;
 }
 
 int32_t panel_getRawY(void)
@@ -134,14 +155,10 @@ int32_t panel_getRawY(void)
     palClearLine(panel_lines[3]);
 
     chThdSleepMicroseconds(PANEL_ADC_STABILITY_TIME_US);
-    // gptPolledDelay( &GPTD3, PANEL_ADC_STABILITY_TIME_GPT_TCK );
     
     panelRawY = panel_get_adc_value();
 
-    palClearLine(panel_lines[0]);
-    palClearLine(panel_lines[1]);
-    palClearLine(panel_lines[2]);
-    palClearLine(panel_lines[3]);
+    panel_clearLines();
 
     return panelRawY;
 }
@@ -164,8 +181,6 @@ float panel_getY(void)
 
 void panel_init(void)
 {
-    gptStart(&GPTD3, &gptcfg);
-
     adcStart(panel_driver, NULL);
     palSetLineMode(panel_line, PAL_MODE_INPUT_ANALOG);
     for ( size_t i = 0; i < sizeof(panel_lines) / sizeof(*panel_lines); i++ )
@@ -206,7 +221,7 @@ void panel_setCSEnabled(bool enabled)
         servoCS_disable();
 }
 
-static THD_WORKING_AREA(waPanelControl_thd, 64);
+static THD_WORKING_AREA(waPanelControl_thd, 1024);
 static THD_FUNCTION(PanelControl_thd, arg) 
 {
     arg = arg;
@@ -232,10 +247,13 @@ static THD_FUNCTION(PanelControl_thd, arg)
         panelX = panel_getX();
         panelY = panel_getY();
 
+        panel_getRawInvX();
+        panel_getRawInvY();
+
         pid_ctx_x.error = referenceX - panelX;
         pid_ctx_y.error = referenceY - panelY;
 
-        if ( panelSystemEnabled && panel_isPressed() )
+        if ( panel_isPressed() && panelSystemEnabled )
         {
             float controlX = PID_getControl(&pid_ctx_x);
             float controlY = PID_getControl(&pid_ctx_y);
@@ -251,7 +269,7 @@ static THD_FUNCTION(PanelControl_thd, arg)
             servoCS_setReference(0, 0);
             servoCS_setReference(1, 0);
         }
-        
+
         chThdSleepUntil(time);
     }
 }
@@ -290,6 +308,7 @@ int main(void)
 
 #define TEST_CONTROL
 // #define TEST_SPEED
+#define DEBUG_MAIN
 
 #ifdef TEST_CONTROL
     servoCS_init();
@@ -308,7 +327,7 @@ int main(void)
     while ( true )
     {   
         palToggleLine( LINE_LED2 );
-
+#ifdef DEBUG_MAIN
         chprintf(debug_stream, "V: %d, %d --- ", 
                         (int)(positionFB_getValue(0)*10), 
                         (int)(positionFB_getValue(1)*10));
@@ -317,8 +336,8 @@ int main(void)
                         positionFB_getRawValue(1));
         chprintf(debug_stream, "T: (%d, %d) --- ", (int)(panelX * 100), 
                                                    (int)(panelY * 100));
-        chprintf(debug_stream, "TR: (%d, %d)\n", panelRawX, panelRawY);
-
+        chprintf(debug_stream, "TR: (%d, %d) %d\n", panelRawX, panelRawY, panelIsPressed);
+#endif
         msg_t msg  = sdGetTimeout(debug_driver, MS2ST(100));     
         char val = msg;
 
