@@ -95,7 +95,7 @@ class BallOnPlate:
 
         self._update_position()
 
-        return self.ballPosition, any(abs(self.ballPosition) > 1.) #self._is_end()
+        return self.ballPosition, self.ballHeight < .0 # any(abs(self.ballPosition) > 1.) #self._is_end()
 
     def _update_position(self):
         ballpos, ballorn = p.getBasePositionAndOrientation(self.ballId, physicsClientId=self.physId)
