@@ -97,6 +97,24 @@ class BallOnPlate:
 
         return self.ballPosition, any(abs(self.ballPosition) > 1.) #self._is_end()
 
+    def control_get_PID(self, raw_pid_rates, input_dict):
+        err = input_dict['error']
+        d_err = input_dict['error_diff']
+        err_integr = input_dict['error_integr']
+
+        raw_pid_rates = np.array(raw_pid_rates, dtype=np.float32)
+
+        prop    = raw_pid_rates[0]
+        diff    = raw_pid_rates[1] / BallOnPlate.D_T
+        integr  = raw_pid_rates[2] * BallOnPlate.D_T
+
+        control = [
+            -(prop * err[1] + diff * d_err[1] + err_integr[1] * integr),
+            prop * err[0] + diff * d_err[0] + err_integr[0] * integr
+        ]
+
+        return np.clip(control, self.env.action_space_low, self.env.action_space_high)
+
     def _update_position(self):
         ballpos, ballorn = p.getBasePositionAndOrientation(self.ballId, physicsClientId=self.physId)
         
