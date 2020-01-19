@@ -1,9 +1,10 @@
 import pybullet as p
-from time import sleep
+import time
 import math
 
-#import matplotlib as mpl 
-#import matplotlib.pyplot as plt 
+import matplotlib as mpl 
+import matplotlib.pyplot as plt 
+mpl.use('TkAgg')
 
 import numpy as np
 
@@ -26,15 +27,17 @@ r_y_vals         = []
 prev_err = [0, 0]
 integr_err = 0
 
-ref_point = np.array([.0, .5])
+ref_point = np.array([.7, .0])
 posOnPlate = ballOnPlate.reset()
 
 pid_rates = [0.8314504111768981, 1.1925901500923737, 0.016085473303319286]
 
-while ballOnPlate.time < 20:
+while ballOnPlate.time < 10:
+
+    start_time = time.time()
 
     t = ballOnPlate.time
-    ref_point = np.array([.5*math.cos(t), .5*math.sin(t)])
+    # ref_point = np.array([.5*math.cos(t), .5*math.sin(t)])
 
     err = ref_point - posOnPlate
     integr_err += err
@@ -55,7 +58,7 @@ while ballOnPlate.time < 20:
     # js1 = p.getJointState(bodyUniqueId=plateId, jointIndex=0)
     # js2 = p.getJointState(bodyUniqueId=plateId, jointIndex=1)
     
-    # t_vals += [t]
+    t_vals += [t]
     # alpha_vals += [js1[0]*180/math.pi]
     # beta_vals += [js2[0]*180/math.pi]
     # ref_alpha_vals += [target_alpha]
@@ -65,15 +68,14 @@ while ballOnPlate.time < 20:
     if isEnd:
         break
 
-    sleep(ballOnPlate.D_T) # Time in seconds.
 
 
 
-    # x_vals += [ballPosOnPlate[0]]
-    # y_vals += [ballPosOnPlate[1]]
+    x_vals += [posOnPlate[0]]
+    y_vals += [posOnPlate[1]]
 
-    # r_x_vals += [ref_point[0]]
-    # r_y_vals += [ref_point[1]]
+    r_x_vals += [ref_point[0]]
+    r_y_vals += [ref_point[1]]
 
 
     # key = p.getKeyboardEvents()
@@ -97,11 +99,16 @@ while ballOnPlate.time < 20:
     #     # plt.plot(t_vals, alpha_vals, color = 'blue', linestyle = 'solid')
     #     # plt.plot(t_vals, beta_vals, color = 'red', linestyle = 'solid')
 
-    #     plt.plot(x_vals, y_vals, color='blue')
-    #     plt.plot(r_x_vals, r_y_vals, color='red')
+    time_2_sleep = ballOnPlate.D_T - (time.time() - start_time)
 
-    #     # plt.plot(t_vals, ref_alpha_vals, color = 'blue', linestyle = 'dashed')
-    #     # plt.plot(t_vals, ref_beta_vals, color = 'red', linestyle = 'dashed')
-    #     plt.show()
+    if time_2_sleep > 0:
+        time.sleep(time_2_sleep) # Time in seconds.
+
+#plt.plot(x_vals, y_vals, color='blue')
+#plt.plot(r_x_vals, r_y_vals, color='red')
+
+plt.plot(t_vals, r_x_vals, color = 'blue', linestyle = 'dashed')
+plt.plot(t_vals, x_vals, color = 'red',)
+plt.show()
 
     #     exit(1)
